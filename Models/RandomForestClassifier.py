@@ -5,9 +5,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import roc_curve
-from sklearn.metrics import confusion_matrix
-import seaborn as sns
-
 
 # Step 1: Data Preprocessing
 # Load the datasets
@@ -63,12 +60,34 @@ test_data = pd.merge(transactions_test, customers, on='CUSTOMER_ID', how='left')
 test_data = pd.merge(test_data, terminals, on='TERMINAL_ID', how='left')
 test_data = pd.merge(test_data, merchants, on='MERCHANT_ID', how='left')
 
-print(len(test_data))
-
 # Dropping columns we don't need
 test_data.drop('ID_JOIN', axis=1, inplace=True)
 
+
 # Step 2: Feature Engineering
+
+# Calculate Euclidean distance for each transaction
+def calculate_euclidean_distance(x1, y1, x2, y2):
+    return np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
+
+
+# Calculate Euclidean distance for each transaction
+train_data['EUCLIDEAN_DISTANCE'] = calculate_euclidean_distance(train_data['x_customer_id'],
+                                                                train_data['y_customer_id'],
+                                                                train_data['x_terminal_id'],
+                                                                train_data['y_terminal__id'])
+
+test_data['EUCLIDEAN_DISTANCE'] = calculate_euclidean_distance(test_data['x_customer_id'],
+                                                               test_data['y_customer_id'],
+                                                               test_data['x_terminal_id'],
+                                                               test_data['y_terminal__id'])
+
+# Set a threshold for anomaly detection
+euclidean_distance_threshold = 10.0
+
+# Flag potential anomalies based on the threshold
+train_data['POTENTIAL_ANOMALY'] = train_data['EUCLIDEAN_DISTANCE']
+
 # Decide to remove non-numerical features as these are breaking the model
 features = [
     'TX_AMOUNT',
@@ -78,13 +97,8 @@ features = [
     'y_customer_id',
     'x_terminal_id',
     'y_terminal__id',
-    'ANNUAL_TURNOVER_CARD',
-    'AVERAGE_TICKET_SALE_AMOUNT',
-    'PAYMENT_PERCENTAGE_FACE_TO_FACE',
-    'PAYMENT_PERCENTAGE_ECOM',
-    'PAYMENT_PERCENTAGE_MOTO'
+    'EUCLIDEAN_DISTANCE',
 ]
-
 
 # Step 3: Model Selection and Training
 X_train = train_data[features]
@@ -132,6 +146,7 @@ plt.xlabel('Transaction Index')
 plt.ylabel('Predicted Probability')
 plt.title('Predicted Probabilities for Test Data')
 plt.legend()
+plt.savefig('../Plots/scatter_plot.png')
 plt.show()
 
 # Step 8 : Plot a ROC Curve
@@ -142,6 +157,7 @@ plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
 plt.title('ROC Curve')
+plt.savefig('../Plots/roc_curve.png')
 plt.show()
 
 # Step 9 : Feature Importance Plot
@@ -154,18 +170,5 @@ plt.barh(range(len(sorted_idx)), feature_importance[sorted_idx], align='center')
 plt.yticks(range(len(sorted_idx)), features_sorted)
 plt.xlabel('Feature Importance')
 plt.title('Feature Importance')
-plt.show()
-
-# Step 10 : Confusion Matrix A confusion matrix is a table used in classification tasks to evaluate the performance
-# of a machine learning model. It allows visualization of the performance of an algorithm, particularly for binary
-# classification problems
-
-threshold = 0.5
-predictions_binary = (train_predictions >= threshold).astype(int)
-conf_matrix = confusion_matrix(y_train, predictions_binary)
-plt.figure(figsize=(8, 6))
-sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')
-plt.xlabel('Predicted')
-plt.ylabel('True')
-plt.title('Confusion Matrix')
+plt.savefig('../Plots/feature_importance_plot.png')
 plt.show()
