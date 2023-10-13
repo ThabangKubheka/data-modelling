@@ -1,6 +1,7 @@
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score
+from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.impute import SimpleImputer
@@ -8,7 +9,6 @@ from sklearn.metrics import roc_curve
 
 # Step 1: Data Preprocessing
 # Load the datasets
-
 bbd_bank_file_path_training = '../Data/Payments Fraud DataSet/transactions_train.csv'
 bbd_bank_file_path_validation = '../Data/Payments Fraud DataSet/transactions_test.csv'
 bbd_bank_file_path_merchants = '../Data/Payments Fraud DataSet/merchants.csv'
@@ -65,7 +65,6 @@ test_data.drop('ID_JOIN', axis=1, inplace=True)
 
 
 # Step 2: Feature Engineering
-
 # Calculate Euclidean distance for each transaction
 def calculate_euclidean_distance(x1, y1, x2, y2):
     return np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
@@ -101,28 +100,40 @@ features = [
 ]
 
 # Step 3: Model Selection and Training
-X_train = train_data[features]
-y_train = train_data['TX_FRAUD']
+X_train, X_validation, y_train, y_validation = train_test_split(
+    train_data[features], train_data['TX_FRAUD'], test_size=0.2, random_state=42,stratify=train_data['TX_FRAUD'])
 
 # Impute missing values using mean
 imputer = SimpleImputer(strategy='mean')
 X_train_imputed = imputer.fit_transform(X_train)
+X_validation_imputed = imputer.transform(X_validation)
 
 # Train a RandomForestClassifier
 model = RandomForestClassifier(random_state=42)
 model.fit(X_train_imputed, y_train)
 
 # Step 4: Model Evaluation
-# Evaluate the model's performance using training data
-train_predictions = model.predict_proba(X_train_imputed)[:, 1]
-train_auc = roc_auc_score(y_train, train_predictions)
-print('AUC on training data:', train_auc)
+# Evaluate the model's performance using validation data
+validation_predictions = model.predict_proba(X_validation_imputed)[:, 1]
+validation_auc = roc_auc_score(y_validation, validation_predictions)
+print('AUC on validation data:', validation_auc)
+
+# Calculate binary predictions based on a threshold of 0.5
+validation_predictions_binary = (validation_predictions >= 0.5).astype(int)
+
+# Calculate validation accuracy, precision, and recall
+validation_accuracy = accuracy_score(y_validation, validation_predictions_binary)
+validation_precision = precision_score(y_validation, validation_predictions_binary)
+validation_recall = recall_score(y_validation, validation_predictions_binary)
+
+print('Validation Accuracy:', validation_accuracy)
+print('Validation Precision:', validation_precision)
+print('Validation Recall:', validation_recall)
 
 # Step 5: Predict on Test Data
 # Evaluate the model's performance using validation data
-X_test = test_data[features]
-X_test_imputed = imputer.transform(X_test)
-test_predictions = model.predict_proba(X_test_imputed)[:, 1]
+test_data_imputed = imputer.transform(test_data[features])
+test_predictions = model.predict_proba(test_data_imputed)[:, 1]
 
 # Preparing for visualization
 # Create an array of transaction indices
@@ -150,7 +161,7 @@ plt.savefig('../Plots/scatter_plot.png')
 plt.show()
 
 # Step 8 : Plot a ROC Curve
-fpr, tpr, _ = roc_curve(y_train, train_predictions)
+fpr, tpr, _ = roc_curve(y_validation, validation_predictions)
 plt.figure(figsize=(10, 6))
 plt.plot(fpr, tpr, color='darkorange', lw=2)
 plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
@@ -172,3 +183,4 @@ plt.xlabel('Feature Importance')
 plt.title('Feature Importance')
 plt.savefig('../Plots/feature_importance_plot.png')
 plt.show()
+
